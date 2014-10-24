@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source "$(dirname $0)/font.sh"
+source "$WD_BOARD/font.sh"
 
 lcorn=("╔" "╟" "╚" "║")
 rcorn=("╗" "╢" "╝" "║")
@@ -131,8 +131,8 @@ function box_board_terminate {
 }
 
 if [ `basename $0` == "board.sh" ]; then
+    source font.sh
     s=4
-
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
         s=$1
     fi
