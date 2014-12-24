@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source "$WD_BOARD/font.sh"
-
 lcorn=("╔" "╟" "╚" "║")
 rcorn=("╗" "╢" "╝" "║")
 cross=("╤" "┼" "╧" "│")
@@ -25,8 +23,7 @@ function line_printer { # $1: total_columns, $2: field
 }
 
 function box_board_print { # $1: size
-    #print_x "\n" $offset_y
-    tput cup 2 0
+    #print_x "\n" $screen_center_y
     line_printer $1 0
     for ((r=1; r <= $1; r++ )); do
         let field=(r == $1)?2:1
@@ -35,6 +32,7 @@ function box_board_print { # $1: size
         done
         line_printer $1 $field
     done
+    print_x "\n" $screen_center_y
 }
 
 function block_update { # $1: x_position, $2: y_position, $3: val
@@ -91,8 +89,8 @@ function box_board_update {
         for ((c=0; c < $size; c++)); do
             if [[ ${old_board[index]} != ${board[index]} ]]; then
                 box_board_block_update $r $c ${board[index]}
+                old_board[$index]=${board[index]}
             fi
-            old_board[$index]=${board[index]}
             let index++
         done
     done
@@ -108,6 +106,7 @@ function box_board_init { # $1: size
         b_height=$(((LINES-4-size)/size))
     fi
 
+
     let b_width=b_height*2+3
     let mid_x=b_width/2+1
     let mid_y=b_height/2+1
@@ -116,6 +115,7 @@ function box_board_init { # $1: size
     let screen_mid=LINES/2
     let offset_x=COLUMNS/2-b_width*size/2-3
     let offset_y=screen_mid-b_height*size/2
+    let screen_center_y="LINES-(size*b_height+size+4)"
     let offset_figlet_y=screen_mid-3
 
     screen_x=$((2+(b_height+1)*size))
@@ -131,7 +131,9 @@ function box_board_terminate {
 }
 
 if [ `basename $0` == "board.sh" ]; then
-    source font.sh
+    WD="$(dirname $(readlink $0 || echo $0))"
+    source $WD/font.sh
+
     s=4
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
         s=$1
@@ -141,13 +143,11 @@ if [ `basename $0` == "board.sh" ]; then
 
     box_board_init $s
 
-    clear
-    box_board_print $s
-    tput cup 0 0
     echo -n "block_size(hxw):${b_height}x$b_width "
     echo -n "mid(x,y):($mid_x,$mid_y) "
     echo -n "offset(x,y):($offset_x,$offset_y) "
-    echo -n "size:${COLUMNS}x$LINES"
+    echo "size:${COLUMNS}x$LINES"
+    box_board_print $s
 
     let N=s*s-1
 
@@ -157,4 +157,6 @@ if [ `basename $0` == "board.sh" ]; then
 
     box_board_update
     box_board_terminate
+else
+    source $WD_BOARD/font.sh
 fi
