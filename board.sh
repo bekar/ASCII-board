@@ -35,20 +35,26 @@ function box_board_print { # $1: size
 
 function box_board_refresh_hook {
     # this function needs to be overrid
-    exit
+    box_board_init $s
+    echo -n "block_size(hxw):${b_height}x$b_width "
+    echo -n "block_mid(x,y):($b_mid_x,$b_mid_y) "
+    echo -n "offset(x,y):($offset_x,$offset_y) "
+    echo "size:${COLUMNS}x$LINES"
+    box_board_print $s
 }
 
 function block_update { # $1: x_position, $2: y_position, $3: val
-    if [[ $FONT_SH != "1" ]]; then
-        block_update2 $1 $2 $3;
+    if [[ $FONT_SH != "1" ]] || (( $b_height < 4 )); then
+        block_update_1px $1 $2 $3;
         return
     fi
 
     font_map $3 && {
-        block_update2 $1 $2 $3;
+        block_update_1px $1 $2 $3;
         return
     }
 
+    # 4px font
     printf "${_colors[$3]}"
     for ((i=0; i < $b_height; i++)); do
         tput cup $(($2+i+1)) $1 || { # Resize fixes
@@ -61,49 +67,51 @@ function block_update { # $1: x_position, $2: y_position, $3: val
     printf "${_colors[0]}"
 }
 
-function box_board_block_update { # $1: row, $2: column, $3: val
+function block_update_ij { # $1: row, $2: column, $3: val
     local r c x y
     r=$1 c=$2
 
     let _r="size - r"
-    LINES=$(tput lines) # for calculation of rescaling
-    echo $LINES > /tmp/test
     let x="1 + offset_x + b_width * c + c"
     let y="LINES - (offset_y + _r * b_height + _r)"
     block_update $x $y $3
 }
 
-function block_update2 { # $1: x_position, $2: y_position, $3: val
-    # does the clean up also
-    val=$3
+function block_update_1px { # $1: x_position, $2: y_position, $3: val
+    local val=$3
     if [[ "$val" == 0 ]]; then
         val=" "
     fi
 
-    for ((i=1; i <= $b_height; i++)); do
+    printf "${_colors[$val]}"
+    for ((i=1; i <= b_height; i++)); do
         tput cup $(($2+i)) $1
-        printf "${_colors[$val]}"
-        if (( i == mid_y )); then
-            printf "%${mid_x}s" $val
-            print_x " " $mid_xr
+        if (( i == b_mid_y )); then
+            printf "%${b_mid_x}s" $val
+            print_x " " $b_mid_xr
         else
-            print_x "${lines[3]}" b_width
+            print_x " " $b_width
         fi
-        printf "${_colors[0]}"
     done
+    printf "${_colors[0]}"
 }
 
 function box_board_update {
+    LINES=$(tput lines)
     local index=0
     for ((r=0; r < $size; r++)); do
         for ((c=0; c < $size; c++)); do
             if [[ ${old_board[index]} != ${board[index]} ]]; then
-                box_board_block_update $r $c ${board[index]}
+                block_update_ij $r $c ${board[index]}
                 old_board[$index]=${board[index]}
             fi
             let index++
         done
     done
+
+    # let offset_figlet_y="LINES - b_height * size + 1"
+    # let board_max_y="offset_y + (b_height + 1) * size"
+    tput cup $LINES 0
 }
 
 function box_board_tput_status {
@@ -131,10 +139,7 @@ function box_board_init { # $1: size
 
     let offset_x=COLUMNS/2-b_width*size/2-3
 
-    let offset_figlet_y=LINES/2-3
-
-    let board_max_y="2 + (b_height + 1) * size"
-
+    let board_max_y="offset_y + (b_height + 1) * size"
 
     tput civis # hide cursor
     stty -echo # disable output
@@ -143,7 +148,17 @@ function box_board_init { # $1: size
 function box_board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
-    tput cup $board_max_y $COLUMNS
+
+    # ANSI sequences: when you send <ESC>[6n to the screen it returns
+    # an escape sequence with the cursor position:
+    # <ESC>[{ROW};{COLUMN}R
+    printf "\E[6n"
+    read -sdR CURPOS
+    CURPOS="${CURPOS#*[}"
+    echo $CURPOS
+    # printf "\e[6n"
+    tput cup $((LINES - (LINES - board_max_y))) 0
+    # printf "\e[6n"
     echo
 }
 
@@ -158,13 +173,7 @@ if [ `basename $0` == "board.sh" ]; then
 
     trap "box_board_terminate; exit" INT
 
-    box_board_init $s
-
-    echo -n "block_size(hxw):${b_height}x$b_width "
-    echo -n "block_mid(x,y):($b_mid_x,$b_mid_y) "
-    echo -n "offset(x,y):($offset_x,$offset_y) "
-    echo "size:${COLUMNS}x$LINES"
-    box_board_print $s
+    box_board_refresh_hook
 
     let N=s*s-1
 
