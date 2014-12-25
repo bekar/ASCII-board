@@ -23,7 +23,6 @@ function line_printer { # $1: total_columns, $2: field
 }
 
 function box_board_print { # $1: size
-    #print_x "\n" $screen_center_y
     line_printer $1 0
     for ((r=1; r <= $1; r++ )); do
         let field=(r == $1)?2:1
@@ -32,7 +31,11 @@ function box_board_print { # $1: size
         done
         line_printer $1 $field
     done
-    print_x "\n" $screen_center_y
+}
+
+function box_board_refresh_hook {
+    # this function needs to be overrid
+    exit
 }
 
 function block_update { # $1: x_position, $2: y_position, $3: val
@@ -48,30 +51,37 @@ function block_update { # $1: x_position, $2: y_position, $3: val
 
     printf "${_colors[$3]}"
     for ((i=0; i < $b_height; i++)); do
-        tput cup $(($1+i+1)) $2
+        tput cup $(($2+i+1)) $1 || { # Resize fixes
+            printf "${_colors[0]}"
+            clear
+            box_board_refresh_hook
+        }
         printf "${word[i]}"
     done
     printf "${_colors[0]}"
 }
 
 function box_board_block_update { # $1: row, $2: column, $3: val
-    local r=$1
-    local c=$2
+    local r c x y
+    r=$1 c=$2
 
-    local x=$((2+r*b_height+$r))
-    local y=$((1+offset_x+b_width*c+c))
-
+    let _r="size - r"
+    LINES=$(tput lines) # for calculation of rescaling
+    echo $LINES > /tmp/test
+    let x="1 + offset_x + b_width * c + c"
+    let y="LINES - (offset_y + _r * b_height + _r)"
     block_update $x $y $3
 }
 
 function block_update2 { # $1: x_position, $2: y_position, $3: val
+    # does the clean up also
     val=$3
     if [[ "$val" == 0 ]]; then
         val=" "
     fi
 
     for ((i=1; i <= $b_height; i++)); do
-        tput cup $(($1+i)) $2
+        tput cup $(($2+i)) $1
         printf "${_colors[$val]}"
         if (( i == mid_y )); then
             printf "%${mid_x}s" $val
@@ -96,29 +106,35 @@ function box_board_update {
     done
 }
 
+function box_board_tput_status {
+    tput cup $((LINES - size * b_height - size - 3 )) 0;
+}
+
 function box_board_init { # $1: size
     size=$1
-    LINES=$(tput lines)
-    COLUMNS=$(tput cols)
-    b_height=$((LINES/size))
+    LINES=$(tput lines) COLUMNS=$(tput cols)
+    let offset_y=2 # header and status
 
-    if ((b_height*size > LINE-5)); then
-        b_height=$(((LINES-4-size)/size))
+    let b_height="(LINES - offset_y) / size"
+    let diff_height="LINE - b_height"
+    if ((diff_height < 0)); then
+        # echo old b_height $b_height
+        let b_height="(LINES - offset_y + diff_height) / size" # diff is -ve
+        # echo new b_height $b_height
     fi
 
+    let b_width="b_height * 2 + 3"
 
-    let b_width=b_height*2+3
-    let mid_x=b_width/2+1
-    let mid_y=b_height/2+1
-    let mid_xr=b_width-mid_x
+    let b_mid_x="b_width / 2 + 1"
+    let b_mid_y="b_height / 2 + 1"
+    let b_mid_xr="b_width - b_mid_x"
 
-    let screen_mid=LINES/2
     let offset_x=COLUMNS/2-b_width*size/2-3
-    let offset_y=screen_mid-b_height*size/2
-    let screen_center_y="LINES-(size*b_height+size+4)"
-    let offset_figlet_y=screen_mid-3
 
-    screen_x=$((2+(b_height+1)*size))
+    let offset_figlet_y=LINES/2-3
+
+    let board_max_y="2 + (b_height + 1) * size"
+
 
     tput civis # hide cursor
     stty -echo # disable output
@@ -127,7 +143,8 @@ function box_board_init { # $1: size
 function box_board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
-    tput cup $screen_x $COLUMNS
+    tput cup $board_max_y $COLUMNS
+    echo
 }
 
 if [ `basename $0` == "board.sh" ]; then
@@ -144,7 +161,7 @@ if [ `basename $0` == "board.sh" ]; then
     box_board_init $s
 
     echo -n "block_size(hxw):${b_height}x$b_width "
-    echo -n "mid(x,y):($mid_x,$mid_y) "
+    echo -n "block_mid(x,y):($b_mid_x,$b_mid_y) "
     echo -n "offset(x,y):($offset_x,$offset_y) "
     echo "size:${COLUMNS}x$LINES"
     box_board_print $s
