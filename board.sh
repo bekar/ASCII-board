@@ -22,6 +22,14 @@ function line_printer { # $1: total_columns, $2: field
     echo "${rcorn[$2]}"
 }
 
+function current_cursor_position {
+    printf "\E[6n"
+    read -sdR CURPOS
+    local IFS=";"
+    CURPOS=($(echo "${CURPOS#*[}"))
+    echo current_y = $CURPOS >&3
+}
+
 function box_board_print { # $1: size
     line_printer $1 0
     for ((r=1; r <= $1; r++ )); do
@@ -58,6 +66,7 @@ function block_update { # $1: x_position, $2: y_position, $3: val
     printf "${_colors[$3]}"
     for ((i=0; i < $b_height; i++)); do
         tput cup $(($2+i+1)) $1 || { # Resize fixes
+            echo ERROR: reloading board >&3
             printf "${_colors[0]}"
             clear
             box_board_refresh_hook
@@ -73,7 +82,10 @@ function block_update_ij { # $1: row, $2: column, $3: val
 
     let _r="size - r"
     let x="1 + offset_x + b_width * c + c"
-    let y="LINES - (offset_y + _r * b_height + _r)"
+    let y="(board_max_y - 2) - (_r * b_height + _r)"
+    printf "b[$r][$c]=%-6d" $3 >&3
+    printf "x:%-2d y:%-3d" $x $y >&3
+    echo board_max_y:$board_max_y >&3
     block_update $x $y $3
 }
 
@@ -98,6 +110,8 @@ function block_update_1px { # $1: x_position, $2: y_position, $3: val
 
 function box_board_update {
     LINES=$(tput lines)
+    current_cursor_position
+    let board_max_y="CURPOS[0]"
     local index=0
     for ((r=0; r < $size; r++)); do
         for ((c=0; c < $size; c++)); do
@@ -108,10 +122,7 @@ function box_board_update {
             let index++
         done
     done
-
-    # let offset_figlet_y="LINES - b_height * size + 1"
-    # let board_max_y="offset_y + (b_height + 1) * size"
-    tput cup $LINES 0
+    tput cup $board_max_y 0
 }
 
 function box_board_tput_status {
@@ -120,15 +131,19 @@ function box_board_tput_status {
 
 function box_board_init { # $1: size
     size=$1
+    echo size = $size >&3
+
     LINES=$(tput lines) COLUMNS=$(tput cols)
+    echo term = $LINES x $COLUMNS >&3
+
     let offset_y=2 # header and status
 
     let b_height="(LINES - offset_y) / size"
     let diff_height="LINE - b_height"
     if ((diff_height < 0)); then
-        # echo old b_height $b_height
+        echo old b_height $b_height >&3
         let b_height="(LINES - offset_y + diff_height) / size" # diff is -ve
-        # echo new b_height $b_height
+        echo new b_height $b_height >&3
     fi
 
     let b_width="b_height * 2 + 3"
@@ -139,8 +154,6 @@ function box_board_init { # $1: size
 
     let offset_x=COLUMNS/2-b_width*size/2-3
 
-    let board_max_y="offset_y + (b_height + 1) * size"
-
     tput civis # hide cursor
     stty -echo # disable output
 }
@@ -148,23 +161,13 @@ function box_board_init { # $1: size
 function box_board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
-
-    # ANSI sequences: when you send <ESC>[6n to the screen it returns
-    # an escape sequence with the cursor position:
-    # <ESC>[{ROW};{COLUMN}R
-    printf "\E[6n"
-    read -sdR CURPOS
-    CURPOS="${CURPOS#*[}"
-    echo $CURPOS
-    # printf "\e[6n"
-    tput cup $((LINES - (LINES - board_max_y))) 0
-    # printf "\e[6n"
     echo
 }
 
 if [ `basename $0` == "board.sh" ]; then
     WD="$(dirname $(readlink $0 || echo $0))"
     source $WD/font.sh
+    exec 3> /tmp/gtmp
 
     s=4
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
@@ -182,6 +185,7 @@ if [ `basename $0` == "board.sh" ]; then
     done
 
     box_board_update
+    echo end_point_y: $board_max_y >&3
     box_board_terminate
 else
     source $WD_BOARD/font.sh
