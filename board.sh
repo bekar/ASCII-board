@@ -39,6 +39,10 @@ function box_board_print { # $1: size
         done
         line_printer $1 $field
     done
+    echo "board_print" >&3
+    current_cursor_position
+    # tput cup $((CURPOS[0]-2)) 0
+    let board_max_y=$((CURPOS[0]-2))
 }
 
 function box_board_refresh_hook {
@@ -82,10 +86,10 @@ function block_update_ij { # $1: row, $2: column, $3: val
 
     let _r="size - r"
     let x="1 + offset_x + b_width * c + c"
-    let y="(board_max_y - 2) - (_r * b_height + _r)"
+    let y="board_max_y - (_r * b_height + _r)"
     printf "b[$r][$c]=%-6d" $3 >&3
     printf "x:%-2d y:%-3d" $x $y >&3
-    echo board_max_y:$board_max_y >&3
+    echo >&3
     block_update $x $y $3
 }
 
@@ -109,9 +113,14 @@ function block_update_1px { # $1: x_position, $2: y_position, $3: val
 }
 
 function box_board_update {
-    LINES=$(tput lines)
-    current_cursor_position
-    let board_max_y="CURPOS[0]"
+    local new_lines=$(tput lines)
+    if (( $new_lines != $LINES )); then # TEMP FIX: for reading input
+        current_cursor_position
+        let board_max_y=$((CURPOS[0]-1))
+        LINES=$new_lines
+    fi
+
+    echo moves: $moves >&3
     local index=0
     for ((r=0; r < $size; r++)); do
         for ((c=0; c < $size; c++)); do
@@ -126,13 +135,12 @@ function box_board_update {
 }
 
 function box_board_tput_status {
-    tput cup $((LINES - size * b_height - size - 3 )) 0;
+    tput cup $((board_max_y - size * b_height - 3 )) 0;
 }
 
 function box_board_init { # $1: size
     size=$1
     echo size = $size >&3
-
     LINES=$(tput lines) COLUMNS=$(tput cols)
     echo term = $LINES x $COLUMNS >&3
 
