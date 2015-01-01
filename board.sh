@@ -71,9 +71,11 @@ function block_update { # $1: x_position, $2: y_position, $3: val
     for ((i=0; i < $b_height; i++)); do
         tput cup $(($2+i+1)) $1 || { # Resize fixes
             echo ERROR: reloading board >&3
-            printf "${_colors[0]}"
-            clear
-            box_board_refresh_hook
+            echo WE CRASHED
+            exit
+            # printf "${_colors[0]}"
+            # clear
+            # box_board_refresh_hook
         }
         printf "${word[i]}"
     done
@@ -120,7 +122,6 @@ function box_board_update {
         LINES=$new_lines
     fi
 
-    echo moves: $moves >&3
     local index=0
     for ((r=0; r < $size; r++)); do
         for ((c=0; c < $size; c++)); do
@@ -135,7 +136,7 @@ function box_board_update {
 }
 
 function box_board_tput_status {
-    tput cup $((board_max_y - size * b_height - 3 )) 0;
+    tput cup $((board_max_y - size * b_height - 5 )) 0
 }
 
 function box_board_init { # $1: size
