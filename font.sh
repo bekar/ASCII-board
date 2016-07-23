@@ -6,6 +6,7 @@ FONT_SH=1
 
 function font_map { # $1: val
     case $1 in
+        0) zero;;
         1) one;;
         2) two;;
         3) three;;
@@ -32,6 +33,13 @@ function printer { # $1: value
     for ((i=0; i<4; i++)); do
         echo "${word[$i]}"
     done
+}
+
+function zero {
+    word[0]="   ▗▄▄▄▖   "
+    word[1]="   █   █   "
+    word[2]="   █   █   "
+    word[3]="    ▀▀▀    "
 }
 
 function one {

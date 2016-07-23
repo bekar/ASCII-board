@@ -5,22 +5,24 @@ rcorn=("╗" "╢" "╝" "║")
 cross=("╤" "┼" "╧" "│")
 lines=("═" "─" "═" " ")
 
-function print_x { # $1: char, $2:repeate
+function _print_x { # $1: char, $2:repeate
     for ((l=0; l<$2; l++)); do
         echo -en "$1";
     done
 }
 
+
 function line_printer { # $1: total_columns, $2: field
     printf "%${offset_x}s" " "
     printf "${lcorn[$2]}";
     for ((j=1; j < $1; j++)); do
-        print_x "${lines[$2]}" $b_width
+        _print_x "${lines[$2]}" $b_width
         printf "${cross[$2]}";
     done
-    print_x "${lines[$2]}" $b_width
+    _print_x "${lines[$2]}" $b_width
     echo "${rcorn[$2]}"
 }
+
 
 function current_cursor_position {
     printf "\E[6n"
@@ -29,6 +31,7 @@ function current_cursor_position {
     CURPOS=($(echo "${CURPOS#*[}"))
     echo current_y = $CURPOS >&3
 }
+
 
 function box_board_print { # $1: size
     line_printer $1 0
@@ -45,6 +48,7 @@ function box_board_print { # $1: size
     let board_max_y=$((CURPOS[0]-2))
 }
 
+
 function box_board_refresh_hook {
     # this function needs to be overrid
     box_board_init $s
@@ -55,7 +59,8 @@ function box_board_refresh_hook {
     box_board_print $s
 }
 
-function block_update { # $1: x_position, $2: y_position, $3: val
+
+function _block_px_update { # $1: x_position, $2: y_position, $3: val
     if [[ $FONT_SH != "1" ]] || (( $b_height < 4 )); then
         block_update_1px $1 $2 $3;
         return
@@ -67,11 +72,11 @@ function block_update { # $1: x_position, $2: y_position, $3: val
     }
 
     # 4px font
-    printf "${_colors[$3]}"
+    printf "${board_vt100_colors}"
     for ((i=0; i < $b_height; i++)); do
         tput cup $(($2+i+1)) $1 || { # Resize fixes
-            echo ERROR: reloading board >&3
-            echo WE CRASHED
+            >&3 echo ERROR: reloading board
+            >&3 echo WE CRASHED
             exit
             # printf "${_colors[0]}"
             # clear
@@ -79,7 +84,7 @@ function block_update { # $1: x_position, $2: y_position, $3: val
         }
         printf "${word[i]}"
     done
-    printf "${_colors[0]}"
+    printf "${board_vt100_normal}"
 }
 
 function block_update_ij { # $1: row, $2: column, $3: val
@@ -92,26 +97,23 @@ function block_update_ij { # $1: row, $2: column, $3: val
     printf "b[$r][$c]=%-6d" $3 >&3
     printf "x:%-2d y:%-3d" $x $y >&3
     echo >&3
-    block_update $x $y $3
+    _block_px_update $x $y $3
 }
 
 function block_update_1px { # $1: x_position, $2: y_position, $3: val
+    # what does this function do
     local val=$3
-    if [[ "$val" == 0 ]]; then
-        val=" "
-    fi
-
-    printf "${_colors[$val]}"
+    printf "${board_vt100_colors}"
     for ((i=1; i <= b_height; i++)); do
         tput cup $(($2+i)) $1
         if (( i == b_mid_y )); then
             printf "%${b_mid_x}s" $val
-            print_x " " $b_mid_xr
+            _print_x " " $b_mid_xr
         else
-            print_x " " $b_width
+            _print_x " " $b_width
         fi
     done
-    printf "${_colors[0]}"
+    printf "${board_vt100_normal}"
 }
 
 function box_board_update {
