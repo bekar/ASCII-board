@@ -2,4 +2,4 @@ run:
 	./board.sh
 
 tmux:
-	tmux send-keys "${PWD}/board.sh" Enter
+	tmux send-keys "${PWD}/board.sh ${SIZE}" Enter

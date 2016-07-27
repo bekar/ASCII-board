@@ -9,6 +9,7 @@ declare board_vt100_tile="\e[1;33;48m"
 declare board_vt100_select="\e[34m"
 declare board_vt100_normal="\e[m"
 
+trap "board_terminate" EXIT
 
 function _print_x { # $1: char, $2:repeate
     for ((l=0; l<$2; l++)); do
@@ -41,6 +42,9 @@ function board_get_current_cursor {
 function board_select_tile_ij { # $1: row, $2: col, $3: select
     # only for board size 2
     local r=$1 c=$2
+    (( $r >= $board_size )) && return
+    (( $c >= $board_size )) && return
+
     let _r="board_size - r"
     let x="offset_x + _tile_width * c + c"
     let y="board_max_y - (_r * _tile_height + _r)"
@@ -64,6 +68,8 @@ function board_select_tile_ij { # $1: row, $2: col, $3: select
 
             *)               local vl=│ vr=│ ht=─ hb=─ tl=┼ tr=┼ bl=┼ br=┼;;
         esac
+        [[ 0 == $end ]] && local vr=║ bl=╚
+        [[ 0 == $end ]] && local hb=═ br=╝ tr=╗
     fi
 
     tput cup $y $x
@@ -98,18 +104,8 @@ function board_print { # $1: board_size
 }
 
 
-function board_refresh_hook {
-    # this function needs to be overrid
-    board_init $s
-    echo -n "tile_size(h×w):${_tile_height}×$_tile_width "
-    echo -n "tile_mid(x,y):($b_mid_x,$b_mid_y) "
-    echo -n "offset(x,y):($offset_x,$offset_y) "
-    echo "size:${COLUMNS}x${LINES}"
-    board_print $s
-}
-
-
 function _tile_px_update { # $1: x_position, $2: y_position, $3: val
+    local x=$1 y=$2 val=$3
     if [[ $FONT_SH != "1" ]] || (( $_tile_height < 4 )); then
         board_tile_update_1px $1 $2 $3;
         return
@@ -132,6 +128,22 @@ function _tile_px_update { # $1: x_position, $2: y_position, $3: val
 }
 
 
+function board_tile_update_1px { # $1: x_position, $2: y_position, $3: val
+    local x=$1 y=$2 val=$3
+    printf "${board_vt100_tile}"
+    for ((i=1; i <= _tile_height; i++)); do
+        tput cup $(($y+i)) $x
+        if (( i == b_mid_y )); then
+            printf "%${b_mid_x}s" $val
+            _print_x " " $b_mid_xr
+        else
+            _print_x " " $_tile_width
+        fi
+    done
+    printf "${board_vt100_normal}"
+}
+
+
 function board_tile_update_ij { # $1: row, $2: column, $3: val
     local r c x y
     r=$1 c=$2
@@ -146,23 +158,6 @@ function board_tile_update_ij { # $1: row, $2: column, $3: val
 }
 
 
-function board_tile_update_1px { # $1: x_position, $2: y_position, $3: val
-    # what does this function do
-    local val=$3
-    printf "${board_vt100_tile}"
-    for ((i=1; i <= _tile_height; i++)); do
-        tput cup $(($2+i)) $1
-        if (( i == b_mid_y )); then
-            printf "%${b_mid_x}s" $val
-            _print_x " " $b_mid_xr
-        else
-            _print_x " " $_tile_width
-        fi
-    done
-    printf "${board_vt100_normal}"
-}
-
-
 function board_update {
     local new_lines=$(tput lines)
     if (( $new_lines != $LINES )); then # TEMP FIX: for reading input
@@ -174,20 +169,22 @@ function board_update {
     local index=0
     for ((r=0; r < $board_size; r++)); do
         for ((c=0; c < $board_size; c++)); do
-            board_vt100_tile=${colors[index]}
+            local val=${board[index]}
+            board_vt100_tile=${colors[val]}
             if [[ ${board_old[index]} != ${board[index]} ]]; then
                 board_tile_update_ij $r $c ${board[index]}
                 board_old[$index]=${board[index]}
             fi
-            let index++
+            let index++ && : # ':' is do nothing
         done
     done
+
     tput cup $board_max_y 0
 }
 
 
 function board_tput_status {
-    tput cup $((board_max_y - board_size * _tile_height - 5 )) 0
+    tput cup $((board_max_y - board_size * _tile_height - board_size - 1)) 0
 }
 
 
@@ -195,17 +192,16 @@ function board_init { # $1: board_size
     board_size=$1
     echo board_size = $board_size >&3
     LINES=$(tput lines) COLUMNS=$(tput cols)
-    echo term = $LINES x $COLUMNS >&3
+    echo term = $LINES × $COLUMNS >&3
 
-    let offset_y=2 # header and status
+    offset_y=2 # header and status
 
-    let _tile_height="(LINES - offset_y) / board_size"
-    let diff_height="LINE - _tile_height"
-    if ((diff_height < 0)); then
-        echo old tile_height $_tile_height >&3
-        let _tile_height="(LINES - offset_y + diff_height) / board_size" # diff is -ve
-        echo new tile height $_tile_height >&3
-    fi
+    local height=$((LINES - offset_y - board_size + 1))
+    >&3 echo max height: $height
+    let _tile_height="(height / board_size)" && :
+    >&3 echo tile height: $_tile_height
+    let diff_height="height - (board_size * _tile_height)" && :
+    >&3 echo diff_height: $diff_height
 
     let _tile_width="_tile_height * 2 + 3"
 
@@ -223,6 +219,7 @@ function board_init { # $1: board_size
 function board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
+    tput cup $board_max_y $COLUMNS
     echo
 }
 
@@ -231,6 +228,8 @@ if [ `basename $0` == "board.sh" ]; then
     WD="$(dirname $(readlink $0 || echo $0))"
     source $WD/font.sh
     exec 3> /tmp/board
+    exec 2>&3 # redirecting errors
+    set -e
 
     s=5
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
@@ -238,8 +237,13 @@ if [ `basename $0` == "board.sh" ]; then
     fi
 
     trap "board_terminate; exit" INT
+    board_init $s
+    echo -n "tile_size(h×w):${_tile_height}×$_tile_width "
+    echo -n "tile_mid(x,y):($b_mid_x,$b_mid_y) "
+    echo -n "offset(x,y):($offset_x,$offset_y) "
+    echo "size:${COLUMNS}x${LINES}"
+    board_print $s
 
-    board_refresh_hook
 
     board_select_tile_ij 2 2
 
@@ -255,15 +259,13 @@ if [ `basename $0` == "board.sh" ]; then
     board_select_tile_ij 4 2 1
     board_select_tile_ij 2 0 1
 
-    let N=s*s-1
-
-    for ((i=N; i>= 0; i--)); do
-        let board[i]=i
+    let N="s*s"
+    for ((i=0; i < N; i++)); do
+        declare board[$i]=$i
     done
 
     board_update
     echo end_point_y: $board_max_y >&3
-    board_terminate
 else
     source $WD_BOARD/font.sh
 fi
