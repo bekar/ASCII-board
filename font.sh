@@ -4,6 +4,15 @@
 
 FONT_SH=1
 
+font_c0="\e[m"
+font_c1="\e[31m"
+font_c2="\e[38;5;22m"
+font_c3="\e[32m"
+font_c4="\e[38;5;226m"
+font_c5="\e[34m"
+font_c6="\e[35m"
+
+
 function font_map { # $1: val
     case $1 in
         0) zero;;
@@ -149,15 +158,15 @@ function fiveonetwo {
 
 function onezerotwofour {
     word[0]="           "
-    word[1]="${c2}▝▌${c1}▛▜${c5}▝▀▚${c6} ▞▌ "
-    word[2]="${c2} ▌${c1}▙▟${c5}▗▟▙${c6}▝▀▛ "
+    word[1]="${font_c2}▝▌${font_c1}▛▜${font_c5}▝▀▚${font_c6} ▞▌ "
+    word[2]="${font_c2} ▌${font_c1}▙▟${font_c5}▗▟▙${font_c6}▝▀▛ "
     word[3]="           "
 }
 
 function twozerofoureight {
-    word[0]="        ${c3}▁▁ "
-    word[1]="${c1}▝▀▚${c4}▛▜${c5} ▞▌${c3}▙▟ "
-    word[2]="${c1}▗▟▙${c4}▙▟${c5}▝▀▛${c3}▙▟ "
+    word[0]="        ${font_c3}▁▁ "
+    word[1]="${font_c1}▝▀▚${font_c4}▛▜${font_c5} ▞▌${font_c3}▙▟ "
+    word[2]="${font_c1}▗▟▙${font_c4}▙▟${font_c5}▝▀▛${font_c3}▙▟ "
     word[3]="           "
 }
 
