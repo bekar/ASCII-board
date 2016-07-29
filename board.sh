@@ -47,7 +47,7 @@ function board_select_tile_ij { # $1: row, $2: col, $3: select
 
     let _r="board_size - r"
     let x="offset_x + _tile_width * c + c"
-    let y="_max_y - (_r * _tile_height + _r) - 2"
+    let y="_max_y - (_r * _tile_height + _r) - 2" # 2 for bottom-boader and shit border
 
     if test -z "$3"; then
         printf "${board_vt100_select}"
@@ -120,9 +120,9 @@ function _tile_px_update { # $1: x_position, $2: y_position, $3: val
     # 4px font
     printf "${board_vt100_tile}"
     for ((i=0; i < $_tile_height; i++)); do
-        tput cup $(($2+i+1)) $1
+        tput cup $(($2+i)) $1
         _print_x " " $_tile_width
-        tput cup $(($2+i+1)) $1
+        tput cup $(($2+i)) $1
         printf "${word[i]}"
     done
     printf "${board_vt100_normal}"
@@ -132,11 +132,11 @@ function _tile_px_update { # $1: x_position, $2: y_position, $3: val
 function board_tile_update_1px { # $1: x_position, $2: y_position, $3: val
     local x=$1 y=$2 val=$3
     printf "${board_vt100_tile}"
-    for ((i=1; i <= _tile_height; i++)); do
+    for ((i=0; i < _tile_height; i++)); do
         tput cup $(($y+i)) $x
-        if (( i == b_mid_y )); then
-            printf "%${b_mid_x}s" $val
-            _print_x " " $b_mid_xr
+        if (( i == tile_mid_y )); then
+            printf "%${tile_mid_x}s" $val
+            _print_x " " $tile_mid_xr
         else
             _print_x " " $_tile_width
         fi
@@ -150,13 +150,28 @@ function board_tile_update_ij { # $1: row, $2: column, $3: val
     r=$1 c=$2
 
     let _r="board_size - r"
-    let x="1 + offset_x + _tile_width * c + c"
-    let y="_max_y - (_r * _tile_height + _r) - 2"
+    let x="offset_x + _tile_width * c + c + 1" # one for left boader
+    let y="_max_y - (_r * _tile_height + _r) - 1" # one for bottom-boader
     printf "b[$r][$c]=%-6d" $3 >&3
     printf "x:%-2d y:%-3d" $x $y >&3
     echo >&3
     _tile_px_update $x $y $3
 }
+
+
+function board_banner {
+    let offset_figlet_y="_max_y - board_size * _tile_height + 2"
+    tput cup $offset_figlet_y 0;
+
+    > /dev/null which figlet && {
+        /usr/bin/figlet "$@"
+        return
+    }
+
+    shift 3 # ignore first 3 arg for figlet
+    echo $@
+    echo "install 'figlet' to display large characters."
+ }
 
 
 function board_update {
@@ -183,30 +198,30 @@ function board_update {
 
 
 function board_tput_status {
-    tput cup $((_max_y - (board_size * _tile_height + board_size +3))) 0
+    tput cup $((_max_y - (board_size * _tile_height + board_size + offset_y + 1))) 0
 }
 
 
 function board_init { # $1: board_size
     board_size=$1
-    echo board_size = $board_size >&3
+    >&3 echo board_size = $board_size
     LINES=$(tput lines) COLUMNS=$(tput cols)
-    echo term = $LINES × $COLUMNS >&3
+    >&3 echo term = $LINES × $COLUMNS
 
-    offset_y=2 # header and status
+    offset_y=3 # header, status and top-boarder
 
-    local height=$((LINES - offset_y - (board_size - 1) - 3))
-    >&3 echo possible tiles height: $height
+    local height=$((LINES - offset_y - board_size))
+    >&3 echo possible tiles stack: $height
     let _tile_height="(height / board_size)" && :
     >&3 echo tile height: $_tile_height
 
-    let _tile_width="_tile_height * 2 + 3"
+    _tile_width=$((_tile_height * 2 + 3))
 
-    let b_mid_x="_tile_width / 2 + 1"
-    let b_mid_y="_tile_height / 2 + 1"
-    let b_mid_xr="_tile_width - b_mid_x"
+    tile_mid_x=$((_tile_width / 2 + 1))
+    tile_mid_y=$((_tile_height / 2))
+    tile_mid_xr=$((_tile_width - tile_mid_x))
 
-    let offset_x="COLUMNS/2 - (_tile_width * board_size/2 + board_size/2)"
+    offset_x=$((COLUMNS/2 - (_tile_width * board_size/2 + board_size/2)))
 
     tput civis # hide cursor
     stty -echo # disable output
@@ -214,9 +229,10 @@ function board_init { # $1: board_size
 
 
 function board_terminate {
+    >&3 echo -n $'\e'"[?9l"$'\e'"?1000l" # disable-mouse
     tput cnorm # show cursor
     stty echo # enable output
-    tput cup $((_max_y+1)) 0
+    tput cup $_max_y 0
 }
 
 
@@ -227,16 +243,17 @@ if [ `basename $0` == "board.sh" ]; then
     exec 2>&3 # redirecting errors
     set -e
 
-    s=1
+    s=5
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
         s=$1
     fi
 
     board_init $s
-    echo -n "sreen:${COLUMNS}x${LINES} "
+    echo -e "\033[1mASCII-board\033[m (https://github.com/bekar/ASCII-board)"
+    echo -n "screen:${COLUMNS}x${LINES} "
     echo -n "offset(x,y):($offset_x,$offset_y) "
     echo -n "tile_size(h×w):${_tile_height}×$_tile_width "
-    echo "tile_mid(x,y):($b_mid_x,$b_mid_y)"
+    echo "tile_mid(x,y):($tile_mid_x,$tile_mid_y)"
 
     board_print $s
 
@@ -257,6 +274,7 @@ if [ `basename $0` == "board.sh" ]; then
     let N="s*s"
     for ((i=0; i < N; i++)); do
         declare board[$i]=$i
+        colors[$i]="\033[1;$((40+i%8))m"
     done
 
     board_update
