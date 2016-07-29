@@ -26,7 +26,7 @@ function _line_printer { # $1: total_columns, $2: field
         printf "${board_CROSS[$2]}";
     done
     _print_x "${board_LINES[$2]}" $_tile_width
-    echo "${board_RCORN[$2]}"
+    printf "${board_RCORN[$2]}"
 }
 
 
@@ -89,17 +89,19 @@ function board_select_tile_ij { # $1: row, $2: col, $3: select
 
 
 function board_print { # $1: board_size
+    >&3 echo "printing border"
     _line_printer $1 0
     for ((r=1; r <= $1; r++ )); do
         let field=(r == $1)?2:1
         for ((i=1; i <= $_tile_height; i++)); do
-            _line_printer $1 3
+            echo; _line_printer $1 3
         done
-        _line_printer $1 $field
+        echo; _line_printer $1 $field
     done
-    echo "board_print_border" >&3
     board_get_current_cursor
-    let _max_y=${CURPOS[0]-1}
+    _max_y=${CURPOS[0]}
+    _max_x=${CURPOS[1]}
+    echo
 }
 
 
@@ -214,7 +216,7 @@ function board_init { # $1: board_size
 function board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
-    tput cup $_max_y 0
+    tput cup $((_max_y+1)) 0
 }
 
 
@@ -225,12 +227,11 @@ if [ `basename $0` == "board.sh" ]; then
     exec 2>&3 # redirecting errors
     set -e
 
-    s=5
+    s=1
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
         s=$1
     fi
 
-    trap "board_terminate; exit" INT
     board_init $s
     echo -n "sreen:${COLUMNS}x${LINES} "
     echo -n "offset(x,y):($offset_x,$offset_y) "
