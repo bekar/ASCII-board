@@ -31,7 +31,7 @@ function _line_printer { # $1: total_columns, $2: field
         printf "${board_CROSS[$2]}";
     done
     _print_x "${board_LINES[$2]}" $_tile_width
-    echo "${board_RCORN[$2]}"
+    printf "${board_RCORN[$2]}"
 }
 
 
@@ -50,9 +50,9 @@ function board_select_tile_ij { # $1: row, $2: col, $3: select
     (( $r >= $board_size )) && return
     (( $c >= $board_size )) && return
 
-    let _r="board_size - r"
-    let x="offset_x + _tile_width * c + c"
-    let y="_max_y - (_r * _tile_height + _r) - 2" # 2 for bottom-boader and shit border
+    local _r=$((board_size - r))
+    local x=$((offset_x + _tile_width * c + c))
+    local y=$((_max_y - (_r * _tile_height + _r) - 1)) # one for header
 
     if test -z "$3"; then
         printf "${board_vt100_select}"
@@ -99,12 +99,13 @@ function board_print { # $1: board_size
     for ((r=1; r <= $1; r++ )); do
         let field=(r == $1)?2:1
         for ((i=1; i <= $_tile_height; i++)); do
-            _line_printer $1 3
+            echo; _line_printer $1 3
         done
-        _line_printer $1 $field
+        echo; _line_printer $1 $field
     done
     board_get_current_cursor
-    _max_y=${CURPOS[0]-1}
+    _max_y=${CURPOS[0]}
+    offset_figlet_y=$((_max_y - board_size * _tile_height + 2))
 }
 
 
@@ -149,12 +150,11 @@ function board_tile_update_1px { # $1: x_position, $2: y_position, $3: val
 
 
 function board_tile_update_ij { # $1: row, $2: column, $3: val
-    local r c x y
-    r=$1 c=$2
+    local r=$1 c=$2
 
     let _r="board_size - r"
-    let x="offset_x + _tile_width * c + c + 1" # one for left boader
-    let y="_max_y - (_r * _tile_height + _r) - 1" # one for bottom-boader
+    local x=$((offset_x + _tile_width * c + c + 1)) # one for left boader
+    local y=$((_max_y - (_r * _tile_height + _r)))
     printf "b[$r][$c]=%-6d" $3 >&3
     printf "x:%-2d y:%-3d" $x $y >&3
     echo >&3
@@ -163,15 +163,13 @@ function board_tile_update_ij { # $1: row, $2: column, $3: val
 
 
 function board_banner {
-    let offset_figlet_y="_max_y - board_size * _tile_height + 2"
     tput cup $offset_figlet_y 0;
 
     > /dev/null which figlet && {
-        /usr/bin/figlet "$@"
+        /usr/bin/figlet -c -w $_COLUMNS "$@"
         return
     }
 
-    shift 3 # ignore first 3 arg for figlet
     echo $@
     echo "install 'figlet' to display large characters."
  }
@@ -194,7 +192,7 @@ function board_update {
 
 
 function board_tput_status {
-    tput cup $((_max_y - board_size * _tile_height - board_size - offset_y)) 0
+    tput cup $((_max_y - board_size * _tile_height - board_size - 2)) 0
 }
 
 
@@ -230,6 +228,7 @@ function board_terminate {
     tput cnorm # show cursor
     stty echo # enable output
     tput cup $_max_y 0
+    echo
 }
 
 
