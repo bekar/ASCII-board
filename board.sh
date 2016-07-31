@@ -31,7 +31,7 @@ function _line_printer { # $1: total_columns, $2: field
         printf "${board_CROSS[$2]}";
     done
     _print_x "${board_LINES[$2]}" $_tile_width
-    printf "${board_RCORN[$2]}"
+    echo "${board_RCORN[$2]}"
 }
 
 
@@ -99,14 +99,12 @@ function board_print { # $1: board_size
     for ((r=1; r <= $1; r++ )); do
         let field=(r == $1)?2:1
         for ((i=1; i <= $_tile_height; i++)); do
-            echo; _line_printer $1 3
+            _line_printer $1 3
         done
-        echo; _line_printer $1 $field
+        _line_printer $1 $field
     done
     board_get_current_cursor
-    _max_y=${CURPOS[0]}
-    _max_x=${CURPOS[1]}
-    echo
+    _max_y=${CURPOS[0]-1}
 }
 
 
@@ -180,13 +178,6 @@ function board_banner {
 
 
 function board_update {
-    local new_lines=$(tput lines)
-    if (( $new_lines != $LINES )); then # TEMP FIX: for reading input
-        board_get_current_cursor
-        let _max_y=$((CURPOS[0]-1))
-        LINES=$new_lines
-    fi
-
     local index=0
     for ((r=0; r < $board_size; r++)); do
         for ((c=0; c < $board_size; c++)); do
@@ -203,7 +194,7 @@ function board_update {
 
 
 function board_tput_status {
-    tput cup $((_max_y - (board_size * _tile_height + board_size + offset_y + 1))) 0
+    tput cup $((_max_y - board_size * _tile_height - board_size - offset_y)) 0
 }
 
 
@@ -226,7 +217,7 @@ function board_init { # $1: board_size
     tile_mid_xr=$((_tile_width - tile_mid_x))
 
     offset_x=$((_COLUMNS/2 - (_tile_width * board_size/2 + board_size/2)))
-
+    _max_x=$((offset_x + _tile_width * board_size + board_size))
     tput civis # hide cursor
     stty -echo # disable output
 }
@@ -283,7 +274,8 @@ if [ `basename $0` == "board.sh" ]; then
     done
 
     board_update
-    echo end_point_y: $_max_y >&3
+    echo max_x: $_max_x >&3
+    echo max_y: $_max_y >&3
 else
     source $WD_BOARD/font.sh
 fi
