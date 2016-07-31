@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# on top because they might be reset to 80×24
+# exec 2>&3 seem to reset it
+declare _LINES=$(tput lines)
+declare _COLUMNS=$(tput cols)
+
 declare board_LCORN=("╔" "╟" "╚" "║")
 declare board_RCORN=("╗" "╢" "╝" "║")
 declare board_CROSS=("╤" "┼" "╧" "│")
@@ -205,12 +210,11 @@ function board_tput_status {
 function board_init { # $1: board_size
     board_size=$1
     >&3 echo board_size = $board_size
-    LINES=$(tput lines) COLUMNS=$(tput cols)
     >&3 echo term = $LINES × $COLUMNS
 
     offset_y=3 # header, status and top-boarder
 
-    local height=$((LINES - offset_y - board_size))
+    local height=$((_LINES - offset_y - board_size))
     >&3 echo possible tiles stack: $height
     let _tile_height="(height / board_size)" && :
     >&3 echo tile height: $_tile_height
@@ -221,7 +225,7 @@ function board_init { # $1: board_size
     tile_mid_y=$((_tile_height / 2))
     tile_mid_xr=$((_tile_width - tile_mid_x))
 
-    offset_x=$((COLUMNS/2 - (_tile_width * board_size/2 + board_size/2)))
+    offset_x=$((_COLUMNS/2 - (_tile_width * board_size/2 + board_size/2)))
 
     tput civis # hide cursor
     stty -echo # disable output
@@ -239,11 +243,12 @@ function board_terminate {
 if [ `basename $0` == "board.sh" ]; then
     WD="$(dirname $(readlink $0 || echo $0))"
     source $WD/font.sh
+
     exec 3> /tmp/board
     exec 2>&3 # redirecting errors
     set -e
 
-    s=5
+    s=4
     if [[ $# -eq 1 ]] && (( "$1" > -1 )); then
         s=$1
     fi
