@@ -224,7 +224,9 @@ function board_init { # $1: board_size
 
 
 function board_terminate {
-    >&3 echo -n $'\e'"[?9l"$'\e'"?1000l" # disable-mouse
+    ESC=$'\e'
+    MOUSE_OFF="${ESC}[?9l${ESC}[?1000l"
+    printf $MOUSE_OFF
     tput cnorm # show cursor
     stty echo # enable output
     tput cup $_max_y 0
