@@ -199,7 +199,7 @@ function board_tput_status {
 function board_init { # $1: board_size
     board_size=$1
     >&3 echo board_size = $board_size
-    >&3 echo term = $LINES × $COLUMNS
+    >&3 echo term = $_LINES × $_COLUMNS
 
     offset_y=3 # header, status and top-boarder
 

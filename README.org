@@ -7,6 +7,7 @@ VT100 to do its magic tricks!
 
 Board games which uses ASCII-board
 
+- [[https://github.com/rhoit/lights-out][lights-out]]
 - [[https://github.com/rhoit/parity][parity]]
 - [[https://github.com/rhoit/2048][2048]]
 - [[https://github.com/rhoit/15][15]]
