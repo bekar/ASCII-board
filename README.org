@@ -1,6 +1,6 @@
 #+TITLE: ASCII-board
 
-Board for Terminal/Shell. Written in bash for board games, It use the
+Board for Terminal/Shell. Written in bash for board games, It uses the
 VT100 to do its magic tricks!
 
 * Used in!
@@ -10,6 +10,7 @@ Board games which uses ASCII-board
 - [[https://github.com/rhoit/lights-out][lights-out]]
 - [[https://github.com/rhoit/parity][parity]]
 - [[https://github.com/rhoit/2048][2048]]
+- [[https://github.com/rhoit/ttt][ttt]]
 - [[https://github.com/rhoit/15][15]]
 
 if you have used the ASCII-board and want to be listed send the pull
